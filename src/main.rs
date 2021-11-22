@@ -20,6 +20,12 @@ static NEXT_USER_ID: AtomicUsize = AtomicUsize::new(1);
 /// - Value is a sender of `warp::ws::Message`
 type Users = Arc<RwLock<HashMap<usize, mpsc::UnboundedSender<Message>>>>;
 
+//TODO:
+// 1. Input room Id
+// 2. click "Enter Room" which changes messages from "Connecting" to "Connected to room#" and establishes websocket
+// 3. adjust route for message sending to be /chat/room
+// 4. Create struct to model 'room'
+
 #[tokio::main]
 async fn main() {
     pretty_env_logger::init();
@@ -31,61 +37,22 @@ async fn main() {
     let users = warp::any().map(move || users.clone());
 
     // GET /chat -> websocket upgrade
-    let chat = warp::path("chat")
+    let chat = warp::path!("chat" / String)
         // The `ws()` filter will prepare Websocket handshake...
         .and(warp::ws())
         .and(users)
-        .map(|ws: warp::ws::Ws, users| {
+        .map(|room_name, ws: warp::ws::Ws, users| {
             // This will call our function if the handshake succeeds.
+            eprintln!("room Id {}", room_name);
             ws.on_upgrade(move |socket| handlers::chat_handlers::user_connected(socket, users))
         });
 
     // GET / -> index html
-    let index = warp::path::end().map(|| warp::reply::html(INDEX_HTML));
+    let index = warp::path::end().map(|| {
+        warp::reply::html(std::fs::read_to_string("src/www/index.html").unwrap())
+    });
 
     let routes = index.or(chat);
 
     warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
 }
-
-static INDEX_HTML: &str = r#"<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <title>Warp Chat</title>
-    </head>
-    <body>
-        <h1>Warp chat</h1>
-        <div id="chat">
-            <p><em>Connecting...</em></p>
-        </div>
-        <input type="text" id="text" />
-        <button type="button" id="send">Send</button>
-        <script type="text/javascript">
-        const chat = document.getElementById('chat');
-        const text = document.getElementById('text');
-        const uri = 'ws://' + location.host + '/chat';
-        const ws = new WebSocket(uri);
-        function message(data) {
-            const line = document.createElement('p');
-            line.innerText = data;
-            chat.appendChild(line);
-        }
-        ws.onopen = function() {
-            chat.innerHTML = '<p><em>Connected!</em></p>';
-        };
-        ws.onmessage = function(msg) {
-            message(msg.data);
-        };
-        ws.onclose = function() {
-            chat.getElementsByTagName('em')[0].innerText = 'Disconnected!';
-        };
-        send.onclick = function() {
-            const msg = text.value;
-            ws.send(msg);
-            text.value = '';
-            message('<You>: ' + msg);
-        };
-        </script>
-    </body>
-</html>
-"#;
