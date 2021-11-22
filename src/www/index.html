@@ -6,10 +6,10 @@
 <body>
 <h1>Warp chat</h1>
 <div id="chat">
-    <p><em>Connecting...</em></p>
+    <p><em>Please input a room name to start chatting</em></p>
 </div>
-<div id="room">
-    <p><label> input your chat room name: <input type="text" id="roomName"></label></p>
+<div id="roomDiv">
+    <p><label> input your chat room name: <input type="text" id="room"></label></p>
     <button type="button" id="roomButton">Enter Room</button>
 </div>
 <div id="textInput">
@@ -19,9 +19,9 @@
 <script type="text/javascript">
     const chat = document.getElementById('chat');
     const text = document.getElementById('text');
-    const uri = 'ws://' + location.host + '/chat/room1';
-    let send = document.getElementById('sendButton')
-    const ws = new WebSocket(uri);
+    let send = document.getElementById('sendButton');
+    let roomButton = document.getElementById('roomButton');
+    let ws;
 
     function message(data)
     {
@@ -30,14 +30,19 @@
         chat.appendChild(line);
     }
 
-    ws.onopen = function () {
-        chat.innerHTML = '<p><em>Connected!</em></p>';
-    };
-    ws.onmessage = function (msg) {
-        message(msg.data);
-    };
-    ws.onclose = function () {
-        chat.getElementsByTagName('em')[0].innerText = 'Disconnected!';
+    roomButton.onclick = function () {
+        console.log("creating websocket");
+        let room = document.getElementById('room').value;
+        ws = new WebSocket('ws://' + location.host + '/chat/' + room);
+        ws.onopen = function () {
+            chat.innerHTML = `<p><em>Connected to ${room}!</em></p>`;
+        };
+        ws.onmessage = function (msg) {
+            message(msg.data);
+        };
+        ws.onclose = function () {
+            chat.getElementsByTagName('em')[0].innerText = 'Disconnected!';
+        };
     };
     send.onclick = function () {
         const msg = text.value;
