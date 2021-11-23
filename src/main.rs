@@ -4,10 +4,6 @@ use warp::Filter;
 mod handlers;
 use handlers::chat_handlers::Rooms;
 
-
-//TODO:
-// 4. Create struct to model 'room'
-
 #[tokio::main]
 async fn main() {
     pretty_env_logger::init();
