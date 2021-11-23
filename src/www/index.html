@@ -21,7 +21,8 @@
     const text = document.getElementById('text');
     let send = document.getElementById('sendButton');
     let roomButton = document.getElementById('roomButton');
-    let ws;
+    let ws = null;
+    let room = null;
 
     function message(data)
     {
@@ -32,17 +33,24 @@
 
     roomButton.onclick = function () {
         console.log("creating websocket");
-        let room = document.getElementById('room').value;
-        ws = new WebSocket('ws://' + location.host + '/chat/' + room);
-        ws.onopen = function () {
-            chat.innerHTML = `<p><em>Connected to ${room}!</em></p>`;
-        };
-        ws.onmessage = function (msg) {
-            message(msg.data);
-        };
-        ws.onclose = function () {
-            chat.getElementsByTagName('em')[0].innerText = 'Disconnected!';
-        };
+        if (ws !== null && room !== document.getElementById('room').value) {
+            ws.close(1000);
+            ws = null;
+            chat.innerHTML = "";
+        }
+        if (ws === null) {
+            room = document.getElementById('room').value;
+            ws = new WebSocket('ws://' + location.host + '/chat/' + room);
+            ws.onopen = function () {
+                chat.innerHTML = `<p><em>Connected to ${room}!</em></p>`;
+            };
+            ws.onmessage = function (msg) {
+                message(msg.data);
+            };
+            ws.onclose = function () {
+                chat.getElementsByTagName('em')[0].innerText = 'Disconnected!';
+            };
+        }
     };
     send.onclick = function () {
         const msg = text.value;

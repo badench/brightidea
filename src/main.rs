@@ -15,14 +15,13 @@ async fn main() {
     // Turn our "state" into a new Filter...
     let rooms = warp::any().map(move || rooms.clone());
 
-    // GET /chat -> websocket upgrade
+    // GET /chat/<roomId> -> websocket upgrade
     let chat = warp::path!("chat" / String)
         // The `ws()` filter will prepare Websocket handshake...
         .and(warp::ws())
         .and(rooms)
         .map(|room_name: String, ws: warp::ws::Ws, rooms: Rooms| {
             // This will call our function if the handshake succeeds.
-            eprintln!("room Id {}", room_name);
             ws.on_upgrade(move |socket| handlers::chat_handlers::join_room(socket, room_name, rooms))
         });
 
