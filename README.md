@@ -17,17 +17,36 @@ To run the code first clone the repository. Then from top level directory execut
 
 ## Project structure
 
-The src folder looks like the following
+The Project has the following directory structure.
 
 ```
 .
-├── handlers
-│   ├── chat_handlers.rs
-│   └── mod.rs
-├── main.rs
-└── www
-    └── index.html
+├── Cargo.lock
+├── Cargo.toml
+├── README.md
+├── logs
+│   ├── room1.log
+│   └── room2.log
+└── src
+    ├── handlers
+    │   ├── chat_handlers.rs
+    │   └── mod.rs
+    ├── logger.rs
+    ├── main.rs
+    └── www
+        └── index.html
+
 
 ```
 
-main.rs contains the code to start the server and serve the accepted paths. Functions to handle requests are defined in the handlers director. The www directory is for web files.
+### src
+
+The src folder contains all the source code for the binary application to run. The handlers module contains code for handling a request at a specific route. The file logger.rs
+contains the logging code. This could eventually be moved to it's own module similar to handlers when more code is added that makes sense to group. The www directory contains web
+files to serve. To run the application use the command
+`cargo run` from the room directory.
+
+### logs
+
+This directory contains chat logs for each room connected to. Two example logs that were written concurrently can be found here. log files are in the format <timestamp>\t<
+user+message>\n
