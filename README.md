@@ -50,3 +50,7 @@ files to serve. To run the application use the command
 
 This directory contains chat logs for each room connected to. Two example logs that were written concurrently can be found here. log files are in the format <timestamp>\t<
 user+message>\n
+
+### Testing
+
+So far logger is the only module with testing. To run tests use the command `cargo test`
