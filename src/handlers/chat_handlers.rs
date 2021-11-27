@@ -4,6 +4,8 @@ use tokio::sync::{mpsc, RwLock};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use futures_util::{SinkExt, StreamExt, TryFutureExt};
 use warp::ws::{Message, WebSocket};
+use chrono::prelude::*;
+use crate::logger::{Logger, LogWriterHandle};
 
 /// Our global unique user id counter.
 static NEXT_USER_ID: AtomicUsize = AtomicUsize::new(1);
@@ -15,7 +17,7 @@ static NEXT_USER_ID: AtomicUsize = AtomicUsize::new(1);
 type Users = Arc<RwLock<HashMap<usize, mpsc::UnboundedSender<Message>>>>;
 pub type Rooms = Arc<RwLock<HashMap<String, Users>>>;
 
-pub async fn join_room(ws: WebSocket, room_name: String, rooms: Rooms) {
+pub async fn join_room(ws: WebSocket, room_name: String, rooms: Rooms, logger: Arc<Logger>) {
     //Acquire write guard to get map of users and then update
     let mut room_guard = rooms.write().await;
     let users = match room_guard.get(&room_name).clone() {
@@ -59,6 +61,7 @@ pub async fn join_room(ws: WebSocket, room_name: String, rooms: Rooms) {
 
     // Every time the user sends a message, broadcast it to
     // all other users...
+    let log_writer = logger.get_log_writer(&room_name).await;
     while let Some(result) = user_ws_rx.next().await {
         let msg = match result {
             Ok(msg) => msg,
@@ -67,7 +70,14 @@ pub async fn join_room(ws: WebSocket, room_name: String, rooms: Rooms) {
                 break;
             }
         };
-        user_message(my_id, msg, &room_name, &rooms).await;
+        match log_writer {
+            Some(ref writer) => {
+                user_message(my_id, msg, &room_name, &rooms, Some(writer)).await;
+            }
+            None => {
+                user_message(my_id, msg, &room_name, &rooms, None).await;
+            }
+        }
     }
 
     // user_ws_rx stream will keep processing as long as the user stays
@@ -75,7 +85,7 @@ pub async fn join_room(ws: WebSocket, room_name: String, rooms: Rooms) {
     user_disconnected(my_id, &room_name, &rooms).await;
 }
 
-async fn user_message(my_id: usize, msg: Message, room_name: &str, rooms: &Rooms) {
+async fn user_message(my_id: usize, msg: Message, room_name: &str, rooms: &Rooms, log_writer: Option<&LogWriterHandle>) {
     // Skip any non-Text messages...
     let msg = if let Ok(s) = msg.to_str() {
         s
@@ -84,6 +94,23 @@ async fn user_message(my_id: usize, msg: Message, room_name: &str, rooms: &Rooms
     };
 
     let new_msg = format!("<User#{}>: {}", my_id, msg);
+    let log_msg = format!("{:?}\t{}\n", Utc::now(), new_msg);
+    match log_writer {
+        Some(writer) => {
+            match writer.log_message(log_msg).await {
+                Ok(_) => { /* Nothing to do here */ }
+                Err(e) => {
+                    // https://docs.rs/tokio/1.14.0/tokio/sync/mpsc/struct.UnboundedSender.html#method.send
+                    // The error includes the value passed to send.
+                    eprintln!("Failed to log message room {} error {}", room_name, e);
+                }
+            }
+        }
+        None => {
+            // must be some error with the logger, just log to stderr for now
+            eprintln!("No Log writer available. Log room {} msg {}", room_name, log_msg);
+        }
+    }
 
     if let Some(users) = rooms.read().await.get(room_name) {
         // New message from this user, send it to everyone else (except same uid)...
